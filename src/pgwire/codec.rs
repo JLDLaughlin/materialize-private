@@ -404,29 +404,38 @@ fn decode_bind(mut buf: Cursor) -> Result<FrontendMessage, io::Error> {
     // for all parameters, if any. (Particularly confusingly, you can specify
     // one text or binary parameter format code, and then proceed to bind zero
     // parameters.) Any additional number of parameter format codes means that
-    // you're supplying one paramater format code per actual bound parameter.
+    // you're supplying one parameter format code per actual bound parameter.
     //
     // The simplest thing to do, since we don't actually support binding
     // parameters, is to accept whatever parameters format codes folks want to
     // supply, and then blow up if they actually try to bind any parameters.
     let parameter_format_code_count = buf.read_i16()?;
+    let mut format_codes = Vec::with_capacity(parameter_format_code_count as usize);
     for _ in 0..parameter_format_code_count {
-        let _ = buf.read_i16()?;
-    }
-    if buf.read_i16()? > 0 {
-        return Err(unsupported_err("binding parameters is not supported"));
+        format_codes.push(FieldFormat::try_from(buf.read_i16()?).map_err(input_err)?);
     }
 
-    let return_format_code_count = buf.read_i16()?;
-    let mut fmt_codes = Vec::with_capacity(return_format_code_count as usize);
-    for _ in 0..return_format_code_count {
-        fmt_codes.push(FieldFormat::try_from(buf.read_i16()?).map_err(input_err)?);
+    let parameter_count = buf.read_i16()?;
+    let mut params = Vec::new();
+    for _ in 0..parameter_count {
+        let length_of_param_value = buf.read_i32()?;
+        if length_of_param_value == -1 {
+            // this will be passed if the Parameter value is Null.
+            params.push(None);
+        } else {
+            let mut value: Vec<u8> = Vec::new();
+            for _ in 0..length_of_param_value {
+                value.push(buf.read_byte()?);
+            }
+            params.push(Some(value));
+        }
     }
 
     Ok(FrontendMessage::Bind {
         portal_name,
         statement_name,
-        return_field_formats: fmt_codes,
+        params,
+        return_field_formats: format_codes,
     })
 }
 

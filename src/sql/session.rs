@@ -279,24 +279,47 @@ impl Session {
         &mut self,
         portal_name: String,
         statement_name: String,
+        params: Vec<Option<Vec<u8>>>, // bytes
         return_field_formats: Vec<bool>,
     ) -> Result<(), failure::Error> {
-        if self.prepared_statements.contains_key(&statement_name) {
-            self.portals.insert(
-                portal_name,
-                Portal {
+        println!("TRYING TO SET PORTAL");
+
+        // if params, blah. else blah.
+        match self.prepared_statements.get(&statement_name) {
+            Some(PreparedStatement {
+                sql,
+                desc,
+                param_types,
+            }) => {
+                println!("have some prepared statement");
+                match sql {
+                    Some(sql_statement) => {
+                        dbg!(&sql_statement);
+                    }
+                    None => {
+                        println!("no sql statement!");
+                    }
+                }
+
+                self.portals.insert(
+                    portal_name,
+                    Portal {
+                        statement_name,
+                        sql: None, // todo: fill
+                        return_field_formats,
+                    },
+                );
+
+                Ok(())
+            }
+            None => {
+                failure::bail!(
+                    "statement does not exist for portal creation: \
+                     statement={:?} portal={:?}",
                     statement_name,
-                    return_field_formats,
-                },
-            );
-            Ok(())
-        } else {
-            failure::bail!(
-                "statement does not exist for portal creation: \
-                 statement={:?} portal={:?}",
-                statement_name,
-                portal_name
-            );
+                    portal_name
+                );
+            }
         }
     }
 
@@ -490,6 +513,7 @@ impl PreparedStatement {
 #[derive(Debug)]
 pub struct Portal {
     pub statement_name: String,
+    pub sql: Option<sqlparser::ast::Statement>,
     /// A vec of "encoded" `materialize::pgwire::message::FieldFormat`s
     pub return_field_formats: Vec<bool>,
 }

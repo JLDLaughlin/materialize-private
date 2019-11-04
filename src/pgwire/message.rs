@@ -137,6 +137,9 @@ pub enum FrontendMessage {
         /// The source prepared statement. An empty string selects the unnamed
         /// prepared statement.
         statement_name: String,
+        /// Bytes of the param values passed from Postgres, None if Null.
+        /// Stored as bytes to simplify decoding.
+        params: Vec<Option<Vec<u8>>>,
         /// The format of each field. If a field is missing from the vector,
         /// then `FieldFormat::Text` should be assumed.
         return_field_formats: Vec<FieldFormat>,
@@ -365,6 +368,39 @@ impl FieldValue {
             Datum::String(s) => Some(FieldValue::Text(s.to_owned())),
         }
     }
+
+    /// Convert from the text postgres wire format
+    /// Can only be text, binary atm.
+    pub(crate) fn to_datum(
+        bytes: Vec<u8>,
+        ff: FieldFormat,
+        scalar_type: ScalarType,
+    ) -> Option<Datum<'static>> {
+        Ok(match ff {
+            FieldFormat::Text => from_text_to_datum(bytes, scalar_type),
+            FieldFormat::Binary => from_binary_to_datum(bytes, scalar_type),
+        })
+    }
+
+    fn from_text_to_datum(bytes: Vec<u8>, scalar_type: ScalarType) -> Option<Datum> {
+        match scalar_type {
+            ScalarType::Null => Some(Datum::Null),
+            ScalarType::Bool => ,
+            ScalarType::Int32 => ,
+            ScalarType::Int64 => ,
+            ScalarType::Float32 => ,
+            ScalarType::Float64 => ,
+            ScalarType::Decimal(_, _) => ,
+            ScalarType::Date => ,
+            ScalarType::Time => ,
+            ScalarType::Timestamp => ,
+            ScalarType::Interval => ,
+            ScalarType::Bytes => ,
+            ScalarType::String => ,
+        }
+    }
+
+    fn from_binary_to_datum(bytes: Vec<u8>, scalar_type: ScalarType) -> Option<Datum> {}
 
     /// Errors on some types:
     ///

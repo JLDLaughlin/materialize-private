@@ -20,6 +20,7 @@ use std::thread::JoinHandle;
 use symbiosis::Postgres;
 
 use super::{coordinator::Coordinator, Command, ExecuteResponse, Response};
+use repr::Row;
 
 enum Message {
     Command(Command),
@@ -110,6 +111,37 @@ where
                 }) => {
                     let result = handle_parse(postgres.as_mut(), &catalog, &mut session, name, sql);
                     let _ = tx.send(Response { result, session });
+                }
+
+                Message::Command(Command::Bind {
+                    session,
+                    statement_name,
+                    portal_name,
+                    parameter_values,
+                    return_formats,
+                    tx,
+                }) => {
+                    // Given ()
+                    // Do (set the portal)
+                    println!("trying to bind!!");
+                    dbg!(
+                        session,
+                        statement_name,
+                        portal_name,
+                        parameter_values,
+                        return_formats
+                    );
+
+                    //                    let result = handle_bind(
+                    //                        postgres.as_mut(),
+                    //                        &catalog,
+                    //                        &mut session,
+                    //                        statement_name,
+                    //                        portal_name,
+                    //                        parameters,
+                    //                        parameter_formats,
+                    //                    );
+                    //                    let _ = tx.send(Response { result, session });
                 }
 
                 Message::Command(Command::CancelRequest { conn_id }) => {
@@ -216,6 +248,8 @@ fn handle_execute<C>(
 where
     C: comm::Connection,
 {
+    // do something here?
+    println!("DO SOMETHING HERE?");
     let portal = session
         .get_portal(&portal_name)
         .ok_or_else(|| failure::format_err!("portal does not exist {:?}", portal_name))?;
@@ -231,6 +265,7 @@ where
     match prepared.sql() {
         Some(stmt) => {
             let stmt = stmt.clone();
+            dbg!(&stmt);
             handle_statement(coord, postgres, catalog, session, stmt, conn_id)
         }
         None => Ok(ExecuteResponse::EmptyQuery),
@@ -267,3 +302,54 @@ fn handle_parse(
     session.set_prepared_statement(name, PreparedStatement::new(stmt, desc, param_types));
     Ok(())
 }
+//
+//fn handle_bind(
+//    postgres: Option<&mut Postgres>,
+//    catalog: &Catalog,
+//    session: &mut Session,
+//    statement_name: String,
+//    portal_name: String,
+//    parameters: Vec<Option<Vec<u8>>>,
+//    parameter_formats: Vec<Row>,
+//) -> Result<(), failure::Error> {
+//    println!("HANDLING BIND!");
+//    let portal = session
+//        .get_portal(&portal_name)
+//        .ok_or_else(|| failure::format_err!("portal does not exist: {:#?}", portal_name))?;
+//    let prepared = session
+//        .get_prepared_statement(&portal.statement_name)
+//        .ok_or_else(|| {
+//            failure::format_err!(
+//                "statement for portal does not exist portal={:?} statement={:?}",
+//                portal_name,
+//                portal.statement_name
+//            )
+//        })?;
+//
+//    Ok(())
+//
+//    //    session.set_portal(portal_name, statement_name, fmts)?;
+//    //
+//    //    // do something here?
+//    //    println!("DO SOMETHING HERE?");
+//    //    let portal = session
+//    //        .get_portal(&portal_name)
+//    //        .ok_or_else(|| failure::format_err!("portal does not exist {:?}", portal_name))?;
+//    //    let prepared = session
+//    //        .get_prepared_statement(&portal.statement_name)
+//    //        .ok_or_else(|| {
+//    //            failure::format_err!(
+//    //                "statement for portal does not exist portal={:?} statement={:?}",
+//    //                portal_name,
+//    //                portal.statement_name
+//    //            )
+//    //        })?;
+//    //    match prepared.sql() {
+//    //        Some(stmt) => {
+//    //            let stmt = stmt.clone();
+//    //            dbg!(&stmt);
+//    //            handle_statement(coord, postgres, catalog, session, stmt, conn_id)
+//    //        }
+//    //        None => Ok(ExecuteResponse::EmptyQuery),
+//    //    }
+//}

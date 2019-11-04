@@ -507,7 +507,11 @@ impl ScalarExpr {
                 SS::Column(column)
             }
             Literal(row, typ) => SS::Literal(row, typ),
-            Parameter(_) => panic!("cannot decorrelate expression with unbound parameters"),
+            Parameter(_) => {
+                dbg!(self);
+                dbg!(relation);
+                panic!("cannot decorrelate expression with unbound parameters")
+            }
             CallUnary { func, expr } => SS::CallUnary {
                 func,
                 expr: Box::new(expr.applied_to(id_gen, outer_arity, relation)?),

@@ -666,6 +666,7 @@ impl State {
             .expect("unnamed prepared statement missing")
             .desc()
             .cloned();
+        // fix this.
         self.session
             .set_portal(portal_name.clone(), statement_name, vec![])?;
 

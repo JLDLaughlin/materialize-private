@@ -18,6 +18,7 @@
 
 use dataflow_types::{PeekResponse, Update};
 use futures::Future;
+use repr::{Datum, Row};
 use sql::Session;
 use std::fmt;
 
@@ -44,11 +45,14 @@ pub enum Command {
     /// Not currently enabled. Since we don't support placeholders yet,
     /// parameter "binding" takes place entirely in the pgwire crate.
     ///
-    // Bind {
-    //     statement_name: String,
-    //     portal_name: String,
-    //     parameter_values: Vec<Datum>,
-    // }
+    Bind {
+        session: Session,
+        statement_name: String,
+        portal_name: String,
+        parameter_values: Vec<Option<Vec<u8>>>,
+        return_formats: Vec<bool>,
+        tx: futures::sync::oneshot::Sender<Response<()>>,
+    },
 
     /// Execute a bound portal.
     Execute {

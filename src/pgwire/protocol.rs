@@ -23,8 +23,8 @@ use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::codec::Codec;
 use crate::message::{
-    self, BackendMessage, FieldFormat, FieldFormatIter, FrontendMessage, Severity, VERSIONS,
-    VERSION_3,
+    self, BackendMessage, FieldFormat, FieldFormatIter, FieldValue, FrontendMessage, Severity,
+    VERSIONS, VERSION_3,
 };
 use crate::secrets::SecretManager;
 use coord::{self, ExecuteResponse};
@@ -494,20 +494,64 @@ impl<A: Conn> PollStateMachine<A> for StateMachine<A> {
             FrontendMessage::Bind {
                 portal_name,
                 statement_name,
+                params,
                 return_field_formats,
             } => {
-                let mut session = state.session;
-                let fmts = return_field_formats.iter().map(bool::from).collect();
                 trace!(
-                    "cid={} handle bind statement={:?} portal={:?}",
+                    "cid={} handle bind statement={:?} portal={:?}, params={:?}",
                     cx.conn_id,
                     statement_name,
                     portal_name,
+                    params
                 );
-                session.set_portal(portal_name, statement_name, fmts)?;
+                let mut session = state.session;
+                let fmts = return_field_formats.iter().map(bool::from).collect();
+
+                if !params.is_empty() {
+                    let portal = session
+                        .get_portal(&portal_name)
+                        .ok_or_else(|| format_err!("portal {:?} does not exist", portal_name))?;
+                    let stmt = session
+                        .get_prepared_statement(&portal.statement_name)
+                        .unwrap();
+                    let param_types = stmt.param_types();
+                    for (i, param) in params.iter().enumerate() {
+                        match param {
+                            Some(bytes) => {
+                                // decode!! :fire: todo: these could also be text strings?
+                                let new_thing = FieldValue::to_datum(bytes, param_types[i]);
+                                println!("DECODED");
+                                dbg!(new_thing);
+                            }
+                            None => println!(
+                                "how would we get here? assume string or something from a comment"
+                            ),
+                        }
+                    }
+
+                    dbg!(stmt);
+                }
+
+                //                let (tx, rx) = futures::sync::oneshot::channel();
+                //                cx.cmdq_tx.unbounded_send(coord::Command::Bind {
+                //                    session: state.session,
+                //                    statement_name,
+                //                    portal_name,
+                //                    parameter_values: params,
+                //                    return_formats: fmts,
+                //                    tx,
+                //                });
+                session.set_portal(portal_name, statement_name, params, fmts);
+
+                // session has parameter type information
+                // use that to decode the bytes stored in params
+                //                let return_field_formats =
+                //                    &return_field_formats.iter().map(FieldFormat::from).collect();
+                //                //                let field_formats = &return_field_formats.iter().map(FieldFormat::from).collect();
+                //                session.set_portal(portal_name, statement_name, fmts)?;
                 transition!(SendBindComplete {
                     send: conn.send(BackendMessage::BindComplete),
-                    session,
+                    session: session,
                 });
             }
             FrontendMessage::Execute { portal_name } => {
@@ -875,8 +919,10 @@ impl<A: Conn> PollStateMachine<A> for StateMachine<A> {
                     let row_desc = stmt.desc().cloned();
                     let portal_name = String::from("");
                     let params = vec![];
+                    let return_types = vec![];
+                    // would need to set more empty fields here.
                     session
-                        .set_portal(portal_name.clone(), statement_name, params)
+                        .set_portal(portal_name.clone(), statement_name, params, return_types)
                         .expect("unnamed statement to be present during simple query flow");
                     let (tx, rx) = futures::sync::oneshot::channel();
                     cx.cmdq_tx.unbounded_send(coord::Command::Execute {
