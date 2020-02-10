@@ -1,7 +1,11 @@
-// Copyright 2019 Materialize, Inc. All rights reserved.
+// Copyright Materialize, Inc. All rights reserved.
 //
-// This file is part of Materialize. Materialize may not be used or
-// distributed without the express permission of Materialize, Inc.
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
 
 //! SQL `Statement`s are the imperative, side-effecting part of SQL.
 //!
@@ -185,7 +189,7 @@ pub fn describe_statement(
                 query::plan_root_query(scx, *query, QueryLifetime::OneShot)?;
             (Some(desc), param_types)
         }
-
+        Statement::CreateTable { .. } => bail!("CREATE TABLE statements are not supported. Try CREATE SOURCE or CREATE [MATERIALIZED] VIEW instead."),
         _ => bail!("unsupported SQL statement: {:?}", stmt),
     })
 }
@@ -506,7 +510,7 @@ fn handle_show_indexes(
                     let arena = RowArena::new();
                     let (col_name, func) = match key_expr {
                         expr::ScalarExpr::Column(i) => {
-                            let col_name = match desc.get_name(i) {
+                            let col_name = match desc.get_unambiguous_name(*i) {
                                 Some(col_name) => col_name.to_string(),
                                 None => format!("@{}", i + 1),
                             };

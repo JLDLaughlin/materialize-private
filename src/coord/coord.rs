@@ -1,7 +1,11 @@
-// Copyright 2019 Materialize, Inc. All rights reserved.
+// Copyright Materialize, Inc. All rights reserved.
 //
-// This file is part of Materialize. Materialize may not be used or
-// distributed without the express permission of Materialize, Inc.
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
 
 //! Coordination of installed views, available timestamps, and compacted timestamps.
 //!
@@ -32,8 +36,8 @@ use dataflow::logging::materialized::MaterializedEvent;
 use dataflow::{SequencedCommand, WorkerFeedback, WorkerFeedbackWithMeta};
 use dataflow_types::logging::LoggingConfig;
 use dataflow_types::{
-    DataflowDesc, ExternalSourceConnector, IndexDesc, PeekResponse, PeekWhen, SinkConnector,
-    TailSinkConnector, Timestamp, Update,
+    DataflowDesc, IndexDesc, PeekResponse, PeekWhen, SinkConnector, TailSinkConnector, Timestamp,
+    Update,
 };
 use expr::transform::Optimizer;
 use expr::{
@@ -475,7 +479,15 @@ where
                             message: WorkerFeedback::DroppedSource(source_id)}) => {
                             // Notify timestamping thread that source has been dropped
                             if let Some(channel) = &mut self.source_updates{
-                                channel.sender.send(TimestampMessage::DropInstance(source_id)).expect("Failed to send Drop Instance notice to Worker");
+                                channel.sender.send(TimestampMessage::DropInstance(source_id)).expect("Failed to send Drop Instance notice to Coordinator");
+                            }
+                        },
+                        Message::Worker(WorkerFeedbackWithMeta {
+                                            worker_id: _,
+                                            message: WorkerFeedback::CreateSource(source_id,ksc,consistency)}) => {
+                            // Notify timestamping thread that source has been created
+                            if let Some(channel) = &mut self.source_updates{
+                                channel.sender.send(TimestampMessage::Add(source_id, ksc.addr, ksc.topic,consistency)).expect("Failed to send CREATE Instance notice to Coordinator");
                             }
                         }
                     }
@@ -564,7 +576,7 @@ where
                 desc,
                 if_not_exists,
             } => {
-                let view_id = self.catalog.allocate_id();
+                let view_id = self.catalog.allocate_id()?;
                 let view = catalog::View {
                     create_sql: "<created by CREATE TABLE>".to_string(),
                     expr: OptimizedRelationExpr::declare_optimized(
@@ -578,7 +590,7 @@ where
                     eval_env: EvalEnv::default(),
                     desc,
                 };
-                let index_id = self.catalog.allocate_id();
+                let index_id = self.catalog.allocate_id()?;
                 let mut index_name = name.clone();
                 index_name.item += "_primary_idx";
                 let index = auto_generate_primary_idx(
@@ -632,7 +644,7 @@ where
                     connector: source.connector,
                     desc: source.desc,
                 };
-                let source_id = self.catalog.allocate_id();
+                let source_id = self.catalog.allocate_id()?;
                 let op = catalog::Op::CreateItem {
                     id: source_id,
                     name,
@@ -655,7 +667,7 @@ where
                     from: sink.from,
                     connector: sink.connector,
                 };
-                let id = self.catalog.allocate_id();
+                let id = self.catalog.allocate_id()?;
                 let op = catalog::Op::CreateItem {
                     id,
                     name: name.clone(),
@@ -681,7 +693,7 @@ where
                 if let Some(id) = replace {
                     ops.extend(self.catalog.drop_items_ops(&[id]));
                 }
-                let view_id = self.catalog.allocate_id();
+                let view_id = self.catalog.allocate_id()?;
                 let eval_env = EvalEnv::default();
                 let view = catalog::View {
                     create_sql: view.create_sql,
@@ -705,7 +717,7 @@ where
                         &view,
                         view_id,
                     );
-                    let index_id = self.catalog.allocate_id();
+                    let index_id = self.catalog.allocate_id()?;
                     ops.push(catalog::Op::CreateItem {
                         id: index_id,
                         name: index_name,
@@ -741,7 +753,7 @@ where
                     on: index.on,
                     eval_env: EvalEnv::default(),
                 };
-                let id = self.catalog.allocate_id();
+                let id = self.catalog.allocate_id()?;
                 let op = catalog::Op::CreateItem {
                     id,
                     name: name.clone(),
@@ -885,7 +897,7 @@ where
                         {
                             (true, *index_id)
                         } else if materialize {
-                            (false, self.catalog.allocate_id())
+                            (false, self.catalog.allocate_id()?)
                         } else {
                             bail!(
                                 "{} is not materialized",
@@ -893,7 +905,7 @@ where
                             )
                         }
                     } else {
-                        (false, self.catalog.allocate_id())
+                        (false, self.catalog.allocate_id()?)
                     };
 
                     let index = if !fast_path {
@@ -914,7 +926,7 @@ where
                             typ.clone(),
                             iter::repeat::<Option<ColumnName>>(None).take(ncols),
                         );
-                        let view_id = self.catalog.allocate_id();
+                        let view_id = self.catalog.allocate_id()?;
                         let view_name = FullName {
                             database: DatabaseSpecifier::Ambient,
                             schema: "temp".into(),
@@ -997,7 +1009,7 @@ where
                         .humanize_id(Id::Global(source_id))
                         .expect("Source id is known to exist in catalog")
                 );
-                let sink_id = self.catalog.allocate_id();
+                let sink_id = self.catalog.allocate_id()?;
                 self.active_tails.insert(conn_id, sink_id);
                 let (tx, rx) = self.switchboard.mpsc_limited(self.num_timely_workers);
                 let since = self
@@ -1180,26 +1192,10 @@ where
         }
         match self.catalog.get_by_id(id).item() {
             CatalogItem::Source(source) => {
-                // A source is being imported as part of a new view. We have to notify the timestamping
-                // thread that a source instance is being created for this view
                 let instance_id = SourceInstanceId {
                     sid: *id,
                     vid: *orig_id,
                 };
-                // Notify timestamping thread that we should start computing timestamps for that thread
-                if let ExternalSourceConnector::Kafka(ksc) = &source.connector.connector {
-                    if let Some(source_updates) = &self.source_updates {
-                        source_updates
-                            .sender
-                            .send(TimestampMessage::Add(
-                                instance_id,
-                                ksc.addr.clone(),
-                                ksc.topic.clone(),
-                                source.connector.consistency.clone(),
-                            ))
-                            .expect("Failed to send source update");
-                    }
-                }
                 dataflow.add_source_import(
                     instance_id,
                     source.connector.clone(),
@@ -1932,17 +1928,12 @@ fn index_sql(
         on_name: sql::normalize::unresolve(view_name),
         key_parts: keys
             .iter()
-            .map(|i| {
-                view_desc
-                    .get_name(i)
-                    .as_ref()
-                    .map(|n| {
-                        Expr::Identifier(Ident {
-                            value: n.to_string(),
-                            quote_style: Some('"'),
-                        })
-                    })
-                    .unwrap_or_else(|| Expr::Value(Value::Number(i.to_string())))
+            .map(|i| match view_desc.get_unambiguous_name(*i) {
+                Some(n) => Expr::Identifier(Ident {
+                    value: n.to_string(),
+                    quote_style: Some('"'),
+                }),
+                _ => Expr::Value(Value::Number((i + 1).to_string())),
             })
             .collect(),
         if_not_exists: false,

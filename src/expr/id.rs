@@ -1,7 +1,11 @@
-// Copyright 2019 Materialize, Inc. All rights reserved.
+// Copyright Materialize, Inc. All rights reserved.
 //
-// This file is part of Materialize. Materialize may not be used or
-// distributed without the express permission of Materialize, Inc.
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
 
 use std::fmt;
 
@@ -34,12 +38,12 @@ pub trait IdHumanizer {
 
 /// The identifier for a local component of a dataflow.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub struct LocalId(usize);
+pub struct LocalId(u64);
 
 impl LocalId {
     /// Constructs a new local identifier. It is the caller's responsibility
     /// to provide a unique `v`.
-    pub fn new(v: usize) -> LocalId {
+    pub fn new(v: u64) -> LocalId {
         LocalId(v)
     }
 }
@@ -54,21 +58,21 @@ impl fmt::Display for LocalId {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum GlobalId {
     /// System namespace.
-    System(usize),
+    System(u64),
     /// User namespace.
-    User(usize),
+    User(u64),
 }
 
 impl GlobalId {
     /// Constructs a new global identifier in the system namespace. It is the
     /// caller's responsibility to provide a unique `v`.
-    pub fn system(v: usize) -> GlobalId {
+    pub fn system(v: u64) -> GlobalId {
         GlobalId::System(v)
     }
 
     /// Constructs a new global identifier in the user namespace. It is the
     /// caller's responsiblity to provide a unique `v`.
-    pub fn user(v: usize) -> GlobalId {
+    pub fn user(v: u64) -> GlobalId {
         GlobalId::User(v)
     }
 

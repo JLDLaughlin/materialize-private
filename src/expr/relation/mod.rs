@@ -1,7 +1,11 @@
-// Copyright 2019 Materialize, Inc. All rights reserved.
+// Copyright Materialize, Inc. All rights reserved.
 //
-// This file is part of Materialize. Materialize may not be used or
-// distributed without the express permission of Materialize, Inc.
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
 
 #![deny(missing_docs)]
 
@@ -1166,12 +1170,12 @@ impl fmt::Display for ColumnOrder {
 /// Manages the allocation of locally unique IDs when building a [`RelationExpr`].
 #[derive(Debug, Default)]
 pub struct IdGen {
-    id: usize,
+    id: u64,
 }
 
 impl IdGen {
     /// Allocates a new identifier and advances the generator.
-    pub fn allocate_id(&mut self) -> usize {
+    pub fn allocate_id(&mut self) -> u64 {
         let id = self.id;
         self.id += 1;
         id

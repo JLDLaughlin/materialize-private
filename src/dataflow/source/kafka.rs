@@ -1,15 +1,17 @@
-// Copyright 2019 Materialize, Inc. All rights reserved.
+// Copyright Materialize, Inc. All rights reserved.
 //
-// This file is part of Materialize. Materialize may not be used or
-// distributed without the express permission of Materialize, Inc.
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use crate::server::TimestampHistories;
-use dataflow_types::{KafkaSourceConnector, Timestamp};
+use crate::server::{TimestampChanges, TimestampHistories};
+use dataflow_types::{Consistency, KafkaSourceConnector, Timestamp};
 use lazy_static::lazy_static;
 use log::{error, warn};
 use prometheus::{register_int_counter, IntCounter};
@@ -41,16 +43,22 @@ pub fn kafka<G>(
     id: SourceInstanceId,
     advance_timestamp: bool,
     timestamp_histories: TimestampHistories,
-    timestamp_tx: Rc<RefCell<Vec<SourceInstanceId>>>,
+    timestamp_tx: TimestampChanges,
+    consistency: Consistency,
     read_kafka: bool,
 ) -> (Stream<G, (Vec<u8>, Option<i64>)>, Option<SourceToken>)
 where
     G: Scope<Timestamp = Timestamp>,
 {
-    let KafkaSourceConnector { addr, topic } = connector;
+    let KafkaSourceConnector { addr, topic } = connector.clone();
 
     let ts = if read_kafka {
-        timestamp_histories.borrow_mut().insert(id.clone(), vec![]);
+        let prev = timestamp_histories.borrow_mut().insert(id.clone(), vec![]);
+        assert!(prev.is_none());
+        timestamp_tx
+            .as_ref()
+            .borrow_mut()
+            .push((id, Some((connector, consistency))));
         Some(timestamp_tx)
     } else {
         None

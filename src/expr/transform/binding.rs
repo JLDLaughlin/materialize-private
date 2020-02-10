@@ -1,7 +1,11 @@
-// Copyright 2019 Materialize, Inc. All rights reserved.
+// Copyright Materialize, Inc. All rights reserved.
 //
-// This file is part of Materialize. Materialize may not be used or
-// distributed without the express permission of Materialize, Inc.
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
 
 //! Processing Bindings
 //!
@@ -116,7 +120,7 @@ impl Drop for LocalBinding<'_> {
 #[derive(Debug, Default)]
 pub struct Environment {
     bindings: IndexMap<LocalId, RelationExpr>,
-    id: usize,
+    id: u64,
 }
 
 impl Environment {
@@ -497,13 +501,13 @@ mod tests {
 
     fn r(id: char, t: RelationType) -> RelationExpr {
         RelationExpr::Get {
-            id: Id::Local(LocalId::new(id as usize)),
+            id: Id::Local(LocalId::new(id as u64)),
             typ: t,
         }
     }
 
     pub fn force_bind(id: char, value: RelationExpr, body: RelationExpr) -> RelationExpr {
-        bind_local(LocalId::new(id as usize), value, body)
+        bind_local(LocalId::new(id as u64), value, body)
     }
 
     #[test]

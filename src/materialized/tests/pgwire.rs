@@ -1,11 +1,17 @@
-// Copyright 2019 Materialize, Inc. All rights reserved.
+// Copyright Materialize, Inc. All rights reserved.
 //
-// This file is part of Materialize. Materialize may not be used or
-// distributed without the express permission of Materialize, Inc.
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
 
 //! Integration tests for pgwire functionality.
 
 use std::error::Error;
+use std::fs::File;
+use std::path::Path;
 use std::thread;
 use std::time::Duration;
 
@@ -197,16 +203,25 @@ fn test_conn_params() -> Result<(), Box<dyn Error>> {
 fn test_persistence() -> Result<(), Box<dyn Error>> {
     ore::log::init();
 
-    let data_directory = tempfile::tempdir()?;
-    let config = util::Config::default().data_directory(data_directory.path().to_owned());
+    let data_dir = tempfile::tempdir()?;
+    let config = util::Config::default().data_directory(data_dir.path().to_owned());
+
+    let temp_dir = tempfile::tempdir()?;
+    let temp_file = Path::join(temp_dir.path(), "source.txt");
+    File::create(&temp_file)?;
 
     {
         let (_server, mut client) = util::start_server(config.clone())?;
-        // TODO(benesch): when file sources land, use them here. Creating a
-        // populated Kafka source here is too annoying.
+        client.batch_execute(&format!(
+            "CREATE SOURCE src FROM FILE '{}' FORMAT BYTES",
+            temp_file.display(),
+        ))?;
         client.batch_execute("CREATE VIEW constant AS SELECT 1")?;
         client.batch_execute(
             "CREATE VIEW logging_derived AS SELECT * FROM mz_catalog.mz_arrangement_sizes",
+        )?;
+        client.batch_execute(
+            "CREATE MATERIALIZED VIEW mat AS SELECT 'a', data, 'c' AS c, data FROM src",
         )?;
         client.batch_execute("CREATE DATABASE d")?;
         client.batch_execute("CREATE SCHEMA d.s")?;
@@ -221,7 +236,20 @@ fn test_persistence() -> Result<(), Box<dyn Error>> {
                 .into_iter()
                 .map(|row| row.get(0))
                 .collect::<Vec<String>>(),
-            &["constant", "logging_derived"]
+            &["constant", "logging_derived", "mat"]
+        );
+        assert_eq!(
+            client
+                .query("SHOW INDEXES FROM mat", &[])?
+                .into_iter()
+                .map(|row| (row.get("Column_name"), row.get("Seq_in_index")))
+                .collect::<Vec<(String, i64)>>(),
+            &[
+                ("@1".into(), 1),
+                ("@2".into(), 2),
+                ("c".into(), 3),
+                ("@4".into(), 4)
+            ],
         );
         assert_eq!(
             client

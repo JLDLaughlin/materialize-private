@@ -1,13 +1,19 @@
-// Copyright 2019 Materialize, Inc. All rights reserved.
+// Copyright Materialize, Inc. All rights reserved.
 //
-// This file is part of Materialize. Materialize may not be used or
-// distributed without the express permission of Materialize, Inc.
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
 
 use dataflow_types::Timestamp;
 use std::cell::RefCell;
 use std::rc::Rc;
 use timely::dataflow::operators::Capability;
 use timely::scheduling::Activator;
+
+use crate::server::TimestampChanges;
 
 mod file;
 mod kafka;
@@ -25,7 +31,7 @@ pub struct SourceToken {
     id: SourceInstanceId,
     capability: Rc<RefCell<Option<Capability<Timestamp>>>>,
     activator: Activator,
-    timestamp_drop: Option<Rc<RefCell<Vec<SourceInstanceId>>>>,
+    timestamp_drop: Option<TimestampChanges>,
 }
 
 impl SourceToken {
@@ -43,7 +49,7 @@ impl Drop for SourceToken {
                 .as_ref()
                 .unwrap()
                 .borrow_mut()
-                .push(self.id);
+                .push((self.id, None));
         }
     }
 }

@@ -1,7 +1,11 @@
-// Copyright 2019 Materialize, Inc. All rights reserved.
+// Copyright Materialize, Inc. All rights reserved.
 //
-// This file is part of Materialize. Materialize may not be used or
-// distributed without the express permission of Materialize, Inc..
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0..
 
 use std::cmp::min;
 use std::convert::Infallible;
@@ -138,7 +142,7 @@ fn print_error_and_backoff(backoff: &mut Duration, error_message: String) {
 /// This ignores errors (just logging them), and can just be run multiple times.
 fn try_initialize(client: &mut Client) {
     match client.batch_execute(
-        "CREATE SOURCE IF NOT EXISTS orderline \
+        "CREATE SOURCE IF NOT EXISTS mysql_tpcch_orderline \
         FROM KAFKA BROKER 'kafka:9092' TOPIC 'mysql.tpcch.orderline' \
         FORMAT AVRO USING CONFLUENT SCHEMA REGISTRY 'http://schema-registry:8081'
         ENVELOPE DEBEZIUM",
@@ -147,7 +151,7 @@ fn try_initialize(client: &mut Client) {
         Err(err) => warn!("error trying to create sources: {}", err),
     }
     match client.batch_execute(
-        "CREATE OR REPLACE MATERIALIZED VIEW q01 AS
+        "CREATE MATERIALIZED VIEW q01 AS
          SELECT
             ol_number,
             sum(ol_quantity) as sum_qty,

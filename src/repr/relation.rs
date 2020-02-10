@@ -1,7 +1,11 @@
-// Copyright 2019 Materialize, Inc. All rights reserved.
+// Copyright Materialize, Inc. All rights reserved.
 //
-// This file is part of Materialize. Materialize may not be used or
-// distributed without the express permission of Materialize, Inc.
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
 
 use std::fmt;
 
@@ -209,8 +213,17 @@ impl RelationDesc {
             .map(|i| (i, &self.typ.column_types[i]))
     }
 
-    pub fn get_name(&self, i: &usize) -> &Option<ColumnName> {
-        &self.names[*i]
+    pub fn get_unambiguous_name(&self, i: usize) -> Option<&ColumnName> {
+        let name = self.get_name(i);
+        if self.iter_names().filter(|n| n == &name).count() == 1 {
+            name
+        } else {
+            None
+        }
+    }
+
+    pub fn get_name(&self, i: usize) -> Option<&ColumnName> {
+        self.names[i].as_ref()
     }
 
     pub fn set_name(&mut self, i: usize, name: Option<ColumnName>) {

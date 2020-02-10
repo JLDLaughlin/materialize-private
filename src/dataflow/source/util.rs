@@ -1,7 +1,11 @@
-// Copyright 2019 Materialize, Inc. All rights reserved.
+// Copyright Materialize, Inc. All rights reserved.
 //
-// This file is part of Materialize. Materialize may not be used or
-// distributed without the express permission of Materialize, Inc.
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -15,6 +19,7 @@ use timely::dataflow::operators::Capability;
 use timely::dataflow::{Scope, Stream};
 use timely::Data;
 
+use crate::server::TimestampChanges;
 use dataflow_types::Timestamp;
 
 use super::{SourceStatus, SourceToken};
@@ -46,7 +51,7 @@ use super::{SourceStatus, SourceToken};
 /// be dropped.
 pub fn source<G, D, B, L>(
     id: SourceInstanceId,
-    timestamp: Option<Rc<RefCell<Vec<SourceInstanceId>>>>,
+    timestamp: Option<TimestampChanges>,
     scope: &G,
     name: &str,
     construct: B,

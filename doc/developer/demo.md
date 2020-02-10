@@ -76,7 +76,6 @@ Now you won't have a prompt. Just enter this manually:
 ```
 {"before": null, "after": {"row": {"quote": "Syntax highlighting is juvenile. —Rob Pike"}}}
 {"before": null, "after": {"row": {"quote": "Arrogance in computer science is measured in nano-Dijkstras. —Alan Kay"}}}
-{"before": null, "after": null}  # send an empty record to flush
 ```
 
 Now we are ready to interact with Materialize!
@@ -88,7 +87,7 @@ $ source doc/developer/assets/demo/utils.sh
 $ mtrlz-shell
 > CREATE SOURCE quotes
   FROM KAFKA BROKER 'localhost' TOPIC 'quotes'
-  FORMAT AVRO USING CONFLUENT SCHEMA REGISTRY 'http://localhost:8081';
+  FORMAT AVRO USING CONFLUENT SCHEMA REGISTRY 'http://localhost:8081' ENVELOPE DEBEZIUM;
 > SHOW COLUMNS FROM quotes;
 > CREATE MATERIALIZED VIEW business_insights AS SELECT quote, 42 FROM quotes;
 > SELECT * FROM business_insights;
@@ -135,7 +134,6 @@ Now you won't have a prompt. Just enter this manually:
 {"before": null, "after": {"row": {"a": 2, "b": 1}}}
 {"before": null, "after": {"row": {"a": 3, "b": 1}}}
 {"before": null, "after": {"row": {"a": 1, "b": 2}}}
-{"before": null, "after": null}
 ```
 
 Then, in another session, open the Materialize shell:
@@ -145,7 +143,7 @@ $ source doc/developer/assets/demo/utils.sh
 $ mtrlz-shell
 > CREATE SOURCE aggdata
   FROM KAFKA BROKER 'localhost' TOPIC 'aggdata'
-  FORMAT AVRO USING CONFLUENT SCHEMA REGISTRY 'http://localhost:8081';
+  FORMAT AVRO USING CONFLUENT SCHEMA REGISTRY 'http://localhost:8081' ENVELOPE DEBEZIUM;
 > CREATE MATERIALIZED VIEW aggtest AS SELECT sum(a) FROM aggdata GROUP BY b;
 > SELECT * FROM aggtest;
 ```
@@ -224,14 +222,6 @@ Now you won't have a prompt. Just enter this manually:
 {"before": null, "after": {"row": {"c": 1, "d": 2}}}
 {"before": null, "after": {"row": {"c": 1, "d": 3}}}
 {"before": null, "after": {"row": {"c": 3, "d": 1}}}
-{"before": null, "after": null}
-```
-
-Go back to the `src1` terminal and flush the data:
-
-```json
-...
-{"before": null, "after": null}
 ```
 
 Then, in another session, open the Materialize shell:
@@ -241,10 +231,10 @@ $ source doc/developer/assets/demo/utils.sh
 $ mtrlz-shell
 > CREATE SOURCE src1 \
   FROM KAFKA BROKER 'localhost' TOPIC 'src1'
-  FORMAT AVRO USING CONFLUENT SCHEMA REGISTRY 'http://localhost:8081';
+  FORMAT AVRO USING CONFLUENT SCHEMA REGISTRY 'http://localhost:8081' ENVELOPE DEBEZIUM;
 > CREATE SOURCE src2
   FROM KAFKA BROKER 'localhost' TOPIC 'src2'
-  FORMAT AVRO USING CONFLUENT SCHEMA REGISTRY 'http://localhost:8081';
+  FORMAT AVRO USING CONFLUENT SCHEMA REGISTRY 'http://localhost:8081' ENVELOPE DEBEZIUM;
 > CREATE MATERIALIZED VIEW jointest AS SELECT a, b, d FROM src1 JOIN src2 ON c = b;
 > SELECT * FROM jointest;
 ```
