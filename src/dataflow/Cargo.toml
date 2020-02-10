@@ -36,6 +36,10 @@ tokio = { version = "0.2", features = ["blocking", "fs", "rt-threaded"] }
 tokio-util = { version = "0.2", features = ["codec"] }
 url = { version = "2.1.1", features = ["serde"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
+rusoto_core = "0.42.0"
+rusoto_credential = "0.42.0"
+rusoto_kinesis = "0.42.0"
+bytes = "0.4.12"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"

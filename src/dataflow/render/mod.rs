@@ -144,6 +144,17 @@ pub(crate) fn build_dataflow<A: Allocate>(
                             read_from_kafka,
                         )
                     }
+                    ExternalSourceConnector::Kinesis(c) => {
+                        source::kinesis(
+                            region,
+                            format!("kinesis-{}", source_number), // should have first_export_id too?
+                            c,
+                            src_id,
+                            advance_timestamp,
+                            timestamp_histories.clone(),
+                            timestamp_drops.clone(),
+                        )
+                    }
                     ExternalSourceConnector::File(c) => {
                         let read_style = if worker_index != 0 {
                             FileReadStyle::None

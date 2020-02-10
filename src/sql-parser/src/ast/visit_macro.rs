@@ -1345,6 +1345,15 @@ macro_rules! make_visitor {
                         visitor.visit_option(option);
                     }
                 }
+                Connector::Kinesis {arn, access_key, secret_access_key, region, with_options } => {
+                    visitor.visit_literal_string(arn);
+                    visitor.visit_literal_string(access_key);
+                    visitor.visit_literal_string(secret_access_key);
+                    visitor.visit_literal_string(region);
+                    for option in with_options {
+                        visitor.visit_option(option);
+                    }
+                }
             }
         }
 
