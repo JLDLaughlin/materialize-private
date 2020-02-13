@@ -653,9 +653,6 @@ pub enum Connector {
     },
     Kinesis {
         arn: String,
-        access_key: String,
-        secret_access_key: String,
-        region: String,
         with_options: Vec<SqlOption>,
     },
 }
@@ -686,20 +683,11 @@ impl fmt::Display for Connector {
                 }
                 Ok(())
             }
-            Connector::Kinesis {
-                arn,
-                access_key,
-                secret_access_key,
-                region,
-                with_options,
-            } => {
+            Connector::Kinesis { arn, with_options } => {
                 write!(
                     f,
-                    "KINESIS ARN '{}' ACCESS_KEY '{}' SECRET_ACCESS_KEY '{}' REGION '{}'",
+                    "KINESIS ARN '{}'",
                     value::escape_single_quote_string(arn),
-                    value::escape_single_quote_string(access_key),
-                    value::escape_single_quote_string(secret_access_key),
-                    value::escape_single_quote_string(region),
                 )?;
                 if !with_options.is_empty() {
                     write!(f, " WITH ({})", display_comma_separated(with_options))?;

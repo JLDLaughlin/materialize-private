@@ -887,20 +887,28 @@ async fn handle_create_dataflow(
                     };
                     build_kafka_source(addr, topic.clone(), format, envelope, consistency).await?
                 }
-                Connector::Kinesis {
-                    arn,
-                    access_key,
-                    secret_access_key,
-                    region,
-                    with_options,
-                } => {
-                    let with_options: HashMap<_, _> = with_options
+                Connector::Kinesis { arn, with_options } => {
+                    let mut with_options: HashMap<_, _> = with_options
                         .iter()
                         .map(|op| (op.name.value.to_ascii_lowercase(), op.value.clone()))
                         .collect();
+                    // todo@jldlaughlin: We should support all (?) variants of AWS authentication.
+                    // https://github.com/materializeinc/materialize/issues/1991
+                    let access_key = match with_options.remove("access_key") {
+                        Some(Value::SingleQuotedString(access_key)) => access_key,
+                        _ => bail!("Kinesis sources require an `access_key` option"),
+                    };
+                    let secret_access_key = match with_options.remove("secret_access_key") {
+                        Some(Value::SingleQuotedString(secret_access_key)) => secret_access_key,
+                        _ => bail!("Kinesis sources require a `secret_access_key` option"),
+                    };
+                    let region = match with_options.remove("region") {
+                        Some(Value::SingleQuotedString(region)) => region,
+                        _ => bail!("Kinesis sources require a `region` option"),
+                    };
                     if !with_options.is_empty() {
                         bail!(
-                            "Kinesis does not currently support WITH options: {}",
+                            "Unexpected WITH options: {}",
                             join(with_options.keys(), ",")
                         )
                     }
